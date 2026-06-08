@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -27,7 +28,12 @@ public class PujaService {
     private static final List<String> CATEGORIAS_SIN_LIMITE = List.of("oro", "platino");
 
     // ── Calcula los límites del slider (los manda el servidor, no el cliente) ──
-    public BidConstraintsDTO calcularRestricciones(Integer itemId, String categoriaSubasta) {
+    // Recibe el subastaId y busca la categoría internamente — el cliente NO la envía.
+    public BidConstraintsDTO calcularRestricciones(Integer subastaId, Integer itemId) {
+
+        // El servidor busca la subasta y saca la categoría
+        Subasta subasta = subastaRepository.findById(subastaId)
+                .orElseThrow(() -> new BusinessException("Subasta no encontrada"));
 
         ItemCatalogo item = itemCatalogoRepository.findById(itemId)
                 .orElseThrow(() -> new BusinessException("Ítem no encontrado"));
@@ -38,7 +44,8 @@ public class PujaService {
         List<Pujo> pujas = pujoRepository.findByItemOrderByImporteDesc(itemId);
         BigDecimal mejorOferta = pujas.isEmpty() ? base : pujas.get(0).getImporte();
 
-        boolean aplicanLimites = !CATEGORIAS_SIN_LIMITE.contains(categoriaSubasta);
+        // La categoría sale de la subasta, no del cliente
+        boolean aplicanLimites = !CATEGORIAS_SIN_LIMITE.contains(subasta.getCategoria());
 
         // puja mínima = mejor oferta + 1% del valor base
         BigDecimal incrementoMin = base.multiply(new BigDecimal("0.01"));
@@ -82,12 +89,9 @@ public class PujaService {
             throw new BusinessException("El medio de pago no está verificado");
         }
 
-        // 3. Traer la subasta para saber la categoría (límites)
-        Subasta subasta = subastaRepository.findById(subastaId)
-                .orElseThrow(() -> new BusinessException("Subasta no encontrada"));
-
-        // 4. Calcular y validar los límites de la puja
-        BidConstraintsDTO limites = calcularRestricciones(itemId, subasta.getCategoria());
+        // 3. Calcular y validar los límites de la puja
+        //    (calcularRestricciones busca la subasta y su categoría internamente)
+        BidConstraintsDTO limites = calcularRestricciones(subastaId, itemId);
 
         if (request.getMonto().compareTo(limites.getPujaMinima()) < 0) {
             throw new BusinessException(
@@ -100,7 +104,7 @@ public class PujaService {
                 "El monto no puede superar " + limites.getPujaMaxima());
         }
 
-        // 5. Buscar (o crear) el asistente que vincula cliente con subasta
+        // 4. Buscar (o crear) el asistente que vincula cliente con subasta
         Asistente asistente = asistenteRepository
                 .findByClienteAndSubasta(clienteId, subastaId)
                 .orElseGet(() -> {
@@ -111,7 +115,7 @@ public class PujaService {
                     return asistenteRepository.save(nuevo);
                 });
 
-        // 6. Crear la puja
+        // 5. Crear la puja
         Pujo pujo = new Pujo();
         pujo.setAsistente(asistente.getIdentificador());
         pujo.setItem(itemId);
@@ -119,7 +123,7 @@ public class PujaService {
         pujo.setGanador("no");
         pujo = pujoRepository.save(pujo);
 
-        // 7. Registrar el estado inicial de la puja como "confirmada"
+        // 6. Registrar el estado inicial de la puja como "confirmada"
         //    (en un sistema real sería "pendiente" hasta procesarla async,
         //     pero para el TP la confirmamos directo)
         EstadoPujo estado = new EstadoPujo();
@@ -128,11 +132,10 @@ public class PujaService {
         estado.setFechaEstado(LocalDateTime.now());
         estadoPujoRepository.save(estado);
 
-        // 8. Calcular los nuevos límites para la próxima puja
-        BidConstraintsDTO nuevosLimites =
-                calcularRestricciones(itemId, subasta.getCategoria());
+        // 7. Calcular los nuevos límites para la próxima puja
+        BidConstraintsDTO nuevosLimites = calcularRestricciones(subastaId, itemId);
 
-        // 9. Armar la respuesta
+        // 8. Armar la respuesta
         PujaResponse response = new PujaResponse();
         response.setPujaId(pujo.getIdentificador());
         response.setEstado("confirmada");
@@ -149,4 +152,44 @@ public class PujaService {
         // Simplificado: en producción contaría los asistentes de la subasta.
         return (int) (System.currentTimeMillis() % 10000);
     }
+
+    // Indica si el cliente puede pujar (tiene al menos un medio de pago verificado)
+    public PuedePujarDTO puedePujar(Integer clienteId) {
+        long mediosVerificados = medioDePagoRepository
+                .countByClienteAndVerificado(clienteId, "si");
+
+        if (mediosVerificados == 0) {
+            return new PuedePujarDTO(false,
+                "Necesitás un medio de pago verificado para poder pujar");
+        }
+        return new PuedePujarDTO(true, null);
+    }
+
+    // Devuelve el historial de pujas de un ítem (las últimas primero)
+    public List<PujaHistorialDTO> obtenerHistorial(Integer itemId, Integer clienteId) {
+
+        List<Pujo> pujas = pujoRepository.findByItemOrderByImporteDesc(itemId);
+        List<PujaHistorialDTO> historial = new ArrayList<>();
+
+        for (Pujo pujo : pujas) {
+            // Buscamos el asistente para saber de quién es la puja
+            Asistente asistente = asistenteRepository.findById(pujo.getAsistente())
+                    .orElse(null);
+
+            PujaHistorialDTO dto = new PujaHistorialDTO();
+            dto.setPujaId(pujo.getIdentificador());
+            dto.setMonto(pujo.getImporte());
+
+            if (asistente != null) {
+                dto.setNumeroPostor(asistente.getNumeroPostor());
+                // Es mía si el cliente del asistente coincide con el usuario actual
+                dto.setEsMia(asistente.getCliente().equals(clienteId));
+            }
+
+            historial.add(dto);
+        }
+
+        return historial;
+    }
+
 }

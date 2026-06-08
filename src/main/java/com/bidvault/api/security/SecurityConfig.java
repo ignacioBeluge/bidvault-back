@@ -23,6 +23,13 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             // Sin sesiones: cada request se autentica con su token (stateless)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .cors(cors -> cors.configurationSource(request -> {
+                var config = new org.springframework.web.cors.CorsConfiguration();
+                config.setAllowedOrigins(java.util.List.of("*"));
+                config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "PATCH"));
+                config.setAllowedHeaders(java.util.List.of("*"));
+                return config;
+            }))
             .authorizeHttpRequests(auth -> auth
                 // Endpoints públicos (no requieren token)
                 .requestMatchers("/auth/**").permitAll()

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 
 @Service
@@ -21,6 +22,7 @@ public class SubastaService {
     private final ProductoRepository productoRepository;
     private final PujoRepository pujoRepository;
     private final CatalogoRepository catalogoRepository; // ver nota al final
+    private final FotoRepository fotoRepository;
 
     // Orden jerárquico de categorías para comparar
     private static final List<String> JERARQUIA =
@@ -131,4 +133,40 @@ public class SubastaService {
         dto.setUbicacion(s.getUbicacion());
         return dto;
     }
+
+    // Detalle de un ítem del catálogo con sus fotos
+    public ItemDetalleDTO obtenerDetalleItem(Integer itemId) {
+
+        ItemCatalogo item = itemCatalogoRepository.findById(itemId)
+                .orElseThrow(() -> new BusinessException("Ítem no encontrado"));
+
+        Producto producto = productoRepository.findById(item.getProducto())
+                .orElseThrow(() -> new BusinessException("Producto no encontrado"));
+
+        ItemDetalleDTO dto = new ItemDetalleDTO();
+        dto.setId(item.getIdentificador());
+        dto.setProducto(item.getProducto());
+        dto.setDescripcionCatalogo(producto.getDescripcionCatalogo());
+        dto.setDescripcionCompleta(producto.getDescripcionCompleta());
+        dto.setPrecioBase(item.getPrecioBase());
+        dto.setComision(item.getComision());
+        dto.setSubastado(item.getSubastado());
+
+        // Mejor oferta actual
+        List<Pujo> pujas = pujoRepository.findByItemOrderByImporteDesc(itemId);
+        dto.setMejorOfertaActual(pujas.isEmpty() ? null : pujas.get(0).getImporte());
+
+        // Convertir las fotos binarias a base64 (data URI para mostrar directo)
+        List<Foto> fotos = fotoRepository.findByProducto(item.getProducto());
+        List<String> fotosBase64 = new ArrayList<>();
+        for (Foto f : fotos) {
+            String base64 = Base64.getEncoder().encodeToString(f.getFoto());
+            fotosBase64.add("data:image/jpeg;base64," + base64);
+        }
+        dto.setFotos(fotosBase64);
+
+        return dto;
+    }
+
+
 }

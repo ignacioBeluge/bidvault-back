@@ -1,5 +1,6 @@
 package com.bidvault.api.controller;
 
+import com.bidvault.api.dto.subasta.ItemDetalleDTO;
 import com.bidvault.api.dto.subasta.SubastaDetalleDTO;
 import com.bidvault.api.dto.subasta.SubastaResumenDTO;
 import com.bidvault.api.security.SecurityUtils;
@@ -32,6 +33,16 @@ public class SubastaController {
     public ResponseEntity<SubastaDetalleDTO> detalle(@PathVariable Integer id) {
         Integer usuarioId = SecurityUtils.getUsuarioId();
         SubastaDetalleDTO detalle = subastaService.obtenerDetalle(id, usuarioId);
+        return ResponseEntity.ok(detalle);
+    }
+
+    // GET /auctions/{id}/items/{itemId}
+    // Detalle de un ítem con descripción completa y fotos
+    @GetMapping("/{id}/items/{itemId}")
+    public ResponseEntity<ItemDetalleDTO> detalleItem(
+            @PathVariable Integer id,
+            @PathVariable Integer itemId) {
+        ItemDetalleDTO detalle = subastaService.obtenerDetalleItem(itemId);
         return ResponseEntity.ok(detalle);
     }
 }

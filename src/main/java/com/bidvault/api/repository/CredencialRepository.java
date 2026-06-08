@@ -13,4 +13,8 @@ public interface CredencialRepository extends JpaRepository<Credencial, Integer>
 
     // Para validar en el registro que el email no esté repetido.
     boolean existsByEmail(String email);
+
+    // En CredencialRepository, agregá:
+    Optional<Credencial> findByPersona(Integer persona);
+
 }
