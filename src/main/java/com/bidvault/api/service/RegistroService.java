@@ -72,69 +72,62 @@ public class RegistroService {
         );
     }
 
-    // Consulta en qué etapa está el registro y si ya fue aprobado
-    public RegistroEstadoDTO consultarEstado(Integer usuarioId) {
-        Credencial credencial = credencialRepository.findById(usuarioId)
-                .orElseThrow(() -> new BusinessException("Usuario no encontrado"));
+    // registrarPaso2 — cambiar el findById por findByPersona
+@Transactional
+public LoginResponse registrarPaso2(RegistroPaso2Request request) {
 
-        Cliente cliente = clienteRepository.findById(credencial.getPersona())
-                .orElseThrow(() -> new BusinessException("Cliente no encontrado"));
-
-        boolean aprobado = "si".equals(cliente.getAdmitido());
-        return new RegistroEstadoDTO(
-            usuarioId,
-            credencial.getEtapaRegistro(),
-            aprobado,
-            cliente.getCategoria()
-        );
+    if (!request.getPassword().equals(request.getPasswordConfirm())) {
+        throw new BusinessException("Las contraseñas no coinciden");
     }
 
-    // ─────────────────────────────────────────────
-    // ETAPA 2 — Activar cuenta con contraseña (requiere estar aprobado)
-    // ─────────────────────────────────────────────
-    @Transactional
-    public LoginResponse registrarPaso2(RegistroPaso2Request request) {
+    // ← ANTES: credencialRepository.findById(request.getUsuarioId())
+    // ← AHORA: busca por persona
+    Credencial credencial = credencialRepository.findByPersona(request.getUsuarioId())
+            .orElseThrow(() -> new BusinessException("Usuario no encontrado"));
 
-        // 1. Validar que las contraseñas coincidan
-        if (!request.getPassword().equals(request.getPasswordConfirm())) {
-            throw new BusinessException("Las contraseñas no coinciden");
-        }
+    Cliente cliente = clienteRepository.findById(credencial.getPersona())
+            .orElseThrow(() -> new BusinessException("Cliente no encontrado"));
 
-        // 2. Buscar la credencial del usuario
-        Credencial credencial = credencialRepository.findById(request.getUsuarioId())
-                .orElseThrow(() -> new BusinessException("Usuario no encontrado"));
-
-        // Nota: buscamos por el id de credencial. Si preferís por persona,
-        // habría que agregar un findByPersona al repository.
-
-        // 3. Validar que la cuenta haya sido aprobada por la empresa
-        Cliente cliente = clienteRepository.findById(credencial.getPersona())
-                .orElseThrow(() -> new BusinessException("Cliente no encontrado"));
-
-        if (!"si".equals(cliente.getAdmitido())) {
-            throw new BusinessException(
-                "Tu cuenta todavía no fue aprobada. Esperá la confirmación de la empresa.");
-        }
-
-        // 4. Setear la contraseña (hasheada) y pasar a etapa 2
-        credencial.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        credencial.setEtapaRegistro(2);
-        credencialRepository.save(credencial);
-
-        // 5. Traer datos para devolver (similar al login)
-        Persona persona = personaRepository.findById(credencial.getPersona())
-                .orElseThrow(() -> new BusinessException("Persona no encontrada"));
-
-        // Devolvemos sin token — el usuario hace login después.
-        // Si querés auto-login, acá generarías el JWT.
-        return new LoginResponse(
-                null,    // sin token (que haga login)
-                persona.getIdentificador(),
-                persona.getNombre(),
-                cliente.getCategoria(),
-                2
-        );
+    if (!"si".equals(cliente.getAdmitido())) {
+        throw new BusinessException(
+            "Tu cuenta todavía no fue aprobada. Esperá la confirmación de la empresa.");
     }
+
+    credencial.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+    credencial.setEtapaRegistro(2);
+    credencialRepository.save(credencial);
+
+    Persona persona = personaRepository.findById(credencial.getPersona())
+            .orElseThrow(() -> new BusinessException("Persona no encontrada"));
+
+    return new LoginResponse(
+            null,
+            persona.getIdentificador(),
+            persona.getNombre(),
+            cliente.getCategoria(),
+            2
+    );
+}
+
+// consultarEstado — cambiar el findById por findByPersona
+public RegistroEstadoDTO consultarEstado(Integer usuarioId) {
+
+    // ← ANTES: credencialRepository.findById(usuarioId)
+    // ← AHORA: busca por persona
+    Credencial credencial = credencialRepository.findByPersona(usuarioId)
+            .orElseThrow(() -> new BusinessException("Usuario no encontrado"));
+
+    Cliente cliente = clienteRepository.findById(credencial.getPersona())
+            .orElseThrow(() -> new BusinessException("Cliente no encontrado"));
+
+    boolean aprobado = "si".equals(cliente.getAdmitido());
+    return new RegistroEstadoDTO(
+        usuarioId,
+        credencial.getEtapaRegistro(),
+        aprobado,
+        cliente.getCategoria()
+    );
+}
 
     // Helper para guardar una foto del DNI desde base64
     private void guardarFotoDni(Integer personaId, String tipo, String base64) {
