@@ -335,8 +335,10 @@ private void completarResultado(EstadoRemateDTO dto, RemateItem remate,
                 dto.setMontoOfertado(pujo.getImporte());
 
                 // Nombre del artículo
-                itemCatalogoRepository.findById(pujo.getItem()).ifPresent(item ->
-                        dto.setNombreArticulo("Artículo #" + item.getProducto()));
+                String nombreArticulo = itemCatalogoRepository.findById(pujo.getItem())
+                        .map(item -> "Artículo #" + item.getProducto())
+                        .orElse("Artículo #" + pujo.getItem());
+                dto.setNombreArticulo(nombreArticulo);
 
                 // ¿Ganó el remate?
                 remateItemRepository.findByItem(pujo.getItem()).ifPresent(remate -> {
