@@ -24,6 +24,8 @@ public class PujaService {
     private final MedioDePagoRepository medioDePagoRepository;
     private final ClienteRepository clienteRepository;
     private final SubastaRepository subastaRepository;
+    private final RemateItemRepository remateItemRepository;
+    private static final int SEGUNDOS_PARA_CERRAR = 60;  // 1 minuto
 
     private static final List<String> CATEGORIAS_SIN_LIMITE = List.of("oro", "platino");
 
@@ -190,6 +192,128 @@ public class PujaService {
         }
 
         return historial;
+    }
+
+    // Calcula el estado del remate de un ítem (para el polling del front)
+@Transactional
+public EstadoRemateDTO obtenerEstadoRemate(Integer subastaId, Integer itemId, Integer clienteId) {
+
+    EstadoRemateDTO dto = new EstadoRemateDTO();
+
+    // 1. Buscar el remate del ítem
+    RemateItem remate = remateItemRepository.findByItem(itemId).orElse(null);
+
+    // Si no hay remate creado, el ítem no está en remate todavía
+    if (remate == null || !"si".equals(remate.getEnRemate())) {
+        dto.setEnRemate(false);
+        dto.setCerrado(false);
+        return dto;
+    }
+
+    // 2. Si ya está cerrado, devolver el resultado guardado
+    if ("si".equals(remate.getCerrado())) {
+        dto.setEnRemate(false);
+        dto.setCerrado(true);
+        completarResultado(dto, remate, itemId, clienteId);
+        return dto;
+    }
+
+    // 3. Está en remate activo. Calcular el tiempo de referencia.
+    LocalDateTime referencia;
+    List<Pujo> pujas = pujoRepository.findByItemOrderByImporteDesc(itemId);
+
+    if (!pujas.isEmpty()) {
+        // Hubo pujas → la referencia es la fecha de la última puja.
+        // Usamos el estado de la puja (estadosPujos tiene fechaEstado).
+        Pujo ultimaPuja = pujas.get(0);
+        List<EstadoPujo> estados =
+                estadoPujoRepository.findByPujoOrderByFechaEstadoDesc(ultimaPuja.getIdentificador());
+        referencia = estados.isEmpty()
+                ? remate.getInicioRemate()
+                : estados.get(0).getFechaEstado();
+    } else {
+        // Sin pujas → la referencia es el inicio del remate
+        referencia = remate.getInicioRemate();
+    }
+
+    // 4. Calcular cuántos segundos pasaron desde la referencia
+    long segundosPasados = java.time.Duration.between(referencia, LocalDateTime.now()).getSeconds();
+    long segundosRestantes = SEGUNDOS_PARA_CERRAR - segundosPasados;
+
+    if (segundosRestantes > 0) {
+        // Sigue activo
+        dto.setEnRemate(true);
+        dto.setCerrado(false);
+        dto.setSegundosRestantes((int) segundosRestantes);
+    } else {
+        // Se cumplió el tiempo → cerrar el remate
+        cerrarRemate(remate, itemId);
+        dto.setEnRemate(false);
+        dto.setCerrado(true);
+        completarResultado(dto, remate, itemId, clienteId);
+    }
+
+    return dto;
+}
+
+// Cierra el remate y determina el ganador
+private void cerrarRemate(RemateItem remate, Integer itemId) {
+    List<Pujo> pujas = pujoRepository.findByItemOrderByImporteDesc(itemId);
+
+    if (!pujas.isEmpty()) {
+        // Gana el mayor postor
+        Pujo ganadora = pujas.get(0);
+        ganadora.setGanador("si");
+        pujoRepository.save(ganadora);
+
+        remate.setAsistenteGanador(ganadora.getAsistente());
+        remate.setGanaEmpresa("no");
+    } else {
+        // Nadie pujó → gana la empresa al precio base
+        remate.setGanaEmpresa("si");
+    }
+
+    remate.setEnRemate("no");
+    remate.setCerrado("si");
+    remate.setFechaCierre(LocalDateTime.now());
+    remateItemRepository.save(remate);
+
+    // Marcar el ítem como subastado
+    itemCatalogoRepository.findById(itemId).ifPresent(item -> {
+        item.setSubastado("si");
+        itemCatalogoRepository.save(item);
+    });
+}
+
+// Completa los datos del resultado en el DTO
+private void completarResultado(EstadoRemateDTO dto, RemateItem remate,
+                                Integer itemId, Integer clienteId) {
+
+        if ("si".equals(remate.getGanaEmpresa())) {
+            // Ganó la empresa (sin pujas) al precio base
+            dto.setGanaEmpresa(true);
+            dto.setGanaste(false);
+            itemCatalogoRepository.findById(itemId).ifPresent(item ->
+                    dto.setMontoFinal(item.getPrecioBase()));
+            return;
+        }
+
+        // Hubo ganador entre los postores
+        if (remate.getAsistenteGanador() != null) {
+            Asistente ganador = asistenteRepository.findById(remate.getAsistenteGanador())
+                    .orElse(null);
+            if (ganador != null) {
+                dto.setNumeroPostorGanador(ganador.getNumeroPostor());
+                // ¿El ganador es el usuario actual?
+                dto.setGanaste(ganador.getCliente().equals(clienteId));
+            }
+
+            // El monto final es la puja ganadora
+            List<Pujo> pujas = pujoRepository.findByItemOrderByImporteDesc(itemId);
+            if (!pujas.isEmpty()) {
+                dto.setMontoFinal(pujas.get(0).getImporte());
+            }
+        }
     }
 
 }

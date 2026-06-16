@@ -102,6 +102,12 @@ public class SubastaService {
             dto.setComision(item.getComision());
             dto.setSubastado(item.getSubastado());
 
+            List<Foto> fotos = fotoRepository.findByProducto(item.getProducto());
+            if (!fotos.isEmpty()) {
+                String base64 = Base64.getEncoder().encodeToString(fotos.get(0).getFoto());
+                dto.setFotoPrincipal("data:image/jpeg;base64," + base64);
+            }
+
             // Descripción del producto
             productoRepository.findById(item.getProducto()).ifPresent(p ->
                     dto.setDescripcion(p.getDescripcionCatalogo()));

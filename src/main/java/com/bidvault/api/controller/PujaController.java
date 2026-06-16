@@ -1,6 +1,7 @@
 package com.bidvault.api.controller;
 
 import com.bidvault.api.dto.puja.BidConstraintsDTO;
+import com.bidvault.api.dto.puja.EstadoRemateDTO;
 import com.bidvault.api.dto.puja.PuedePujarDTO;
 import com.bidvault.api.dto.puja.PujaHistorialDTO;
 import com.bidvault.api.dto.puja.PujaRequest;
@@ -65,5 +66,17 @@ public class PujaController {
         Integer usuarioId = SecurityUtils.getUsuarioId();
         List<PujaHistorialDTO> historial = pujaService.obtenerHistorial(itemId, usuarioId);
         return ResponseEntity.ok(historial);
+    }
+
+    // GET /auctions/{subastaId}/items/{itemId}/estado-remate
+    // Polling del estado del remate (activo, cerrado, ganador)
+    @GetMapping("/items/{itemId}/estado-remate")
+    public ResponseEntity<EstadoRemateDTO> estadoRemate(
+            @PathVariable Integer subastaId,
+            @PathVariable Integer itemId) {
+        Integer usuarioId = SecurityUtils.getUsuarioId();
+        EstadoRemateDTO estado =
+                pujaService.obtenerEstadoRemate(subastaId, itemId, usuarioId);
+        return ResponseEntity.ok(estado);
     }
 }

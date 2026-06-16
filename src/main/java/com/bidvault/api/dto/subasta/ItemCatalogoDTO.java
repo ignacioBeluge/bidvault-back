@@ -13,4 +13,5 @@ public class ItemCatalogoDTO {
     private BigDecimal comision;
     private String subastado;
     private BigDecimal mejorOfertaActual;  // la puja más alta hasta ahora
+    private String fotoPrincipal;
 }
