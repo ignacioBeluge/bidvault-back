@@ -33,6 +33,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Endpoints públicos (no requieren token)
                 .requestMatchers("/auth/**").permitAll()
+                .requestMatchers("/admin/**").permitAll()
                 // El resto requiere token válido
                 .anyRequest().authenticated()
             )
