@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -314,6 +315,41 @@ private void completarResultado(EstadoRemateDTO dto, RemateItem remate,
                 dto.setMontoFinal(pujas.get(0).getImporte());
             }
         }
+    }
+
+    // ── Historial de pujas del usuario (todas las subastas) ──
+    public List<MiPujaDTO> miHistorial(Integer clienteId) {
+        // Todos los asistentes del cliente (una entrada por subasta a la que fue)
+        List<Asistente> asistentes = asistenteRepository.findByCliente(clienteId);
+
+        List<MiPujaDTO> resultado = new ArrayList<>();
+
+        for (Asistente asistente : asistentes) {
+            // Todas las pujas que hizo este asistente
+            List<Pujo> pujas = pujoRepository.findByAsistente(asistente.getIdentificador());
+
+            for (Pujo pujo : pujas) {
+                MiPujaDTO dto = new MiPujaDTO();
+                dto.setItemId(pujo.getItem());
+                dto.setSubastaId(asistente.getSubasta());
+                dto.setMontoOfertado(pujo.getImporte());
+
+                // Nombre del artículo
+                itemCatalogoRepository.findById(pujo.getItem()).ifPresent(item ->
+                        dto.setNombreArticulo("Artículo #" + item.getProducto()));
+
+                // ¿Ganó el remate?
+                remateItemRepository.findByItem(pujo.getItem()).ifPresent(remate -> {
+                    dto.setRemateCerrado("si".equals(remate.getCerrado()));
+                    dto.setGane(asistente.getIdentificador()
+                            .equals(remate.getAsistenteGanador()));
+                });
+
+                resultado.add(dto);
+            }
+        }
+
+        return resultado;
     }
 
 }

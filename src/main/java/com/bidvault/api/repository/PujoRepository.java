@@ -16,4 +16,6 @@ public interface PujoRepository extends JpaRepository<Pujo, Integer> {
     // La necesitamos para validar que la nueva puja supere a la actual.
     @Query("SELECT p FROM Pujo p WHERE p.item = :item ORDER BY p.importe DESC")
     List<Pujo> findMayorPuja(@Param("item") Integer item);
+
+    List<Pujo> findByAsistente(Integer asistenteId);
 }
