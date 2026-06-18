@@ -211,4 +211,29 @@ public class ArticuloService {
                 "Rechazaste las condiciones. El artículo no se subastará.");
         }
     }
+
+    // El usuario confirma que envió el producto al depósito
+    @Transactional
+    public ArticuloResponse confirmarEnvio(Integer productoId, Integer clienteId) {
+
+        EstadoArticulo estado = estadoArticuloRepository.findByProducto(productoId)
+                .orElseThrow(() -> new BusinessException("Artículo no encontrado"));
+
+        // Validar pertenencia
+        if (!estado.getClientePublicador().equals(clienteId)) {
+            throw new BusinessException("Este artículo no te pertenece");
+        }
+
+        // Solo se puede confirmar envío si está pendiente de envío
+        if (!"PENDIENTE_ENVIO".equals(estado.getEstado())) {
+            throw new BusinessException(
+                "El artículo no está pendiente de envío");
+        }
+
+        estado.setEstado("ENVIADO");
+        estadoArticuloRepository.save(estado);
+
+        return new ArticuloResponse(productoId, "ENVIADO",
+            "Confirmamos el envío. Te avisaremos cuando inspeccionemos el artículo.");
+    }
 }

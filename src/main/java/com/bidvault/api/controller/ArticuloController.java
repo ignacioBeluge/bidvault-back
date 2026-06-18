@@ -79,4 +79,12 @@ public class ArticuloController {
         AmpliarPolizaResponse response = seguroService.ampliarPoliza(id, usuarioId);
         return ResponseEntity.ok(response);
     }
+
+    // POST /articulos/{id}/confirmar-envio
+    @PostMapping("/{id}/confirmar-envio")
+    public ResponseEntity<ArticuloResponse> confirmarEnvio(@PathVariable Integer id) {
+        Integer usuarioId = SecurityUtils.getUsuarioId();
+        ArticuloResponse response = articuloService.confirmarEnvio(id, usuarioId);
+        return ResponseEntity.ok(response);
+    }
 }

@@ -1,5 +1,6 @@
 package com.bidvault.api.controller;
 
+import com.bidvault.api.dto.puja.ItemEnRemateDTO;
 import com.bidvault.api.dto.subasta.ItemDetalleDTO;
 import com.bidvault.api.dto.subasta.SubastaDetalleDTO;
 import com.bidvault.api.dto.subasta.SubastaResumenDTO;
@@ -44,5 +45,13 @@ public class SubastaController {
             @PathVariable Integer itemId) {
         ItemDetalleDTO detalle = subastaService.obtenerDetalleItem(itemId);
         return ResponseEntity.ok(detalle);
+    }
+
+    // GET /auctions/{id}/item-en-remate
+    // Devuelve qué ítem está en remate activo (para "conectarse a la subasta")
+    @GetMapping("/{id}/item-en-remate")
+    public ResponseEntity<ItemEnRemateDTO> itemEnRemate(@PathVariable Integer id) {
+        ItemEnRemateDTO resultado = subastaService.itemEnRemate(id);
+        return ResponseEntity.ok(resultado);
     }
 }

@@ -1,9 +1,12 @@
 package com.bidvault.api.service;
 
+import com.bidvault.api.dto.puja.ItemEnRemateDTO;
 import com.bidvault.api.dto.subasta.*;
 import com.bidvault.api.entity.*;
 import com.bidvault.api.repository.*;
 import com.bidvault.api.exception.BusinessException;
+import com.bidvault.api.dto.puja.ItemEnRemateDTO;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +26,7 @@ public class SubastaService {
     private final PujoRepository pujoRepository;
     private final CatalogoRepository catalogoRepository; // ver nota al final
     private final FotoRepository fotoRepository;
+    private final RemateItemRepository remateItemRepository;
 
     // Orden jerárquico de categorías para comparar
     private static final List<String> JERARQUIA =
@@ -171,6 +175,40 @@ public class SubastaService {
         }
         dto.setFotos(fotosBase64);
 
+        return dto;
+    }
+
+    // Indica qué ítem de la subasta está en remate activo ahora mismo
+    public ItemEnRemateDTO itemEnRemate(Integer subastaId) {
+        ItemEnRemateDTO dto = new ItemEnRemateDTO();
+
+        // Buscar todos los remates activos
+        List<RemateItem> activos = remateItemRepository
+                .findByEnRemateAndCerrado("si", "no");
+
+        // Filtrar los que pertenecen a esta subasta
+        for (RemateItem remate : activos) {
+            ItemCatalogo item = itemCatalogoRepository.findById(remate.getItem())
+                    .orElse(null);
+            if (item == null) continue;
+
+            // Verificar que el ítem sea de un catálogo de esta subasta
+            Catalogo catalogo = catalogoRepository.findById(item.getCatalogo())
+                    .orElse(null);
+            if (catalogo != null && catalogo.getSubasta().equals(subastaId)) {
+                // Encontramos el ítem en remate de esta subasta
+                dto.setHayRemateActivo(true);
+                dto.setItemId(item.getIdentificador());
+
+                // Nombre del producto
+                productoRepository.findById(item.getProducto()).ifPresent(p ->
+                        dto.setDescripcion(p.getDescripcionCatalogo()));
+                return dto;
+            }
+        }
+
+        // No hay ningún ítem en remate en esta subasta
+        dto.setHayRemateActivo(false);
         return dto;
     }
 
