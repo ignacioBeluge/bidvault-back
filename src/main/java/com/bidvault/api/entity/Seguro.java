@@ -7,7 +7,7 @@ import java.time.LocalDate;
 
 @Data
 @Entity
-@Table(name = "seguros")
+@Table(name = "segurosApp")
 public class Seguro {
 
     @Id

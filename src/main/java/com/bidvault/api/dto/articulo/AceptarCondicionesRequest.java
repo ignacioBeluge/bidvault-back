@@ -8,4 +8,8 @@ public class AceptarCondicionesRequest {
 
     @NotNull(message = "Debe indicar si acepta o no")
     private Boolean acepta;   // true = acepta el precio, false = lo rechaza
+    
+    // La cuenta de cobro elegida (obligatoria solo si acepta)
+    private Integer cuentaCobro;
+
 }

@@ -24,6 +24,12 @@ public class ArticuloService {
     private final EstadoArticuloRepository estadoArticuloRepository;
     private final DeclaracionJuradaRepository declaracionJuradaRepository;
 
+    private final ItemCatalogoRepository itemCatalogoRepository;
+    private final CatalogoRepository catalogoRepository;
+    private final SubastaRepository subastaRepository;
+    private final RegistroDeSubastaRepository registroDeSubastaRepository;
+
+
     private static final int MIN_FOTOS = 6;
 
     // ─────────────────────────────────────────────
@@ -175,6 +181,34 @@ public class ArticuloService {
         }
         dto.setFotos(fotosBase64);
 
+            // Si el artículo está en subasta o vendido, traer los datos de la subasta
+    if ("EN_SUBASTA".equals(estado.getEstado()) || "VENDIDO".equals(estado.getEstado())) {
+        // Buscar el ítem de catálogo de este producto
+        List<ItemCatalogo> items = itemCatalogoRepository.findByProducto(productoId);
+        if (!items.isEmpty()) {
+            ItemCatalogo item = items.get(0);
+            dto.setValorBase(item.getPrecioBase());
+            dto.setComisionSubasta(item.getComision());
+
+            // Seguir la cadena hasta la subasta
+            catalogoRepository.findById(item.getCatalogo()).ifPresent(catalogo -> {
+                subastaRepository.findById(catalogo.getSubasta()).ifPresent(subasta -> {
+                    dto.setSubastaFecha(subasta.getFecha() != null ? subasta.getFecha().toString() : null);
+                    dto.setSubastaHora(subasta.getHora() != null ? subasta.getHora().toString() : null);
+                    dto.setSubastaLugar(subasta.getUbicacion());
+                });
+            });
+        }
+
+                // Si está vendido, traer los valores REALES de la venta
+        if ("VENDIDO".equals(estado.getEstado())) {
+            registroDeSubastaRepository.findByProducto(productoId).ifPresent(venta -> {
+                dto.setPrecioVenta(venta.getImporte());      // lo que se pagó
+                dto.setComisionVenta(venta.getComision());   // la comisión cobrada
+            });
+        }
+    }
+
         return dto;
     }
 
@@ -183,24 +217,28 @@ public class ArticuloService {
     // ─────────────────────────────────────────────
     @Transactional
     public ArticuloResponse responderCondiciones(Integer productoId, Integer clienteId,
-                                                 AceptarCondicionesRequest request) {
+                                                AceptarCondicionesRequest request) {
 
         EstadoArticulo estado = estadoArticuloRepository.findByProducto(productoId)
                 .orElseThrow(() -> new BusinessException("Artículo no encontrado"));
 
-        // Validar pertenencia
         if (!estado.getClientePublicador().equals(clienteId)) {
             throw new BusinessException("Este artículo no te pertenece");
         }
 
-        // Solo se puede responder si la empresa ya propuso un precio
         if (!"PRECIO_ASIGNADO".equals(estado.getEstado())) {
-            throw new BusinessException(
-                "El artículo no está en estado de aceptar condiciones");
+            throw new BusinessException("El artículo no está en estado de aceptar condiciones");
         }
 
         if (Boolean.TRUE.equals(request.getAcepta())) {
+            // Al aceptar, la cuenta de cobro es obligatoria
+            if (request.getCuentaCobro() == null) {
+                throw new BusinessException(
+                    "Debés declarar una cuenta bancaria para cobrar la venta");
+            }
+
             estado.setEstado("ACEPTADO");
+            estado.setCuentaCobro(request.getCuentaCobro());   // guardamos la cuenta
             estadoArticuloRepository.save(estado);
             return new ArticuloResponse(productoId, "ACEPTADO",
                 "Aceptaste las condiciones. La empresa asignará tu artículo a una subasta.");

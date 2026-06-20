@@ -34,4 +34,6 @@ public class EstadoArticulo {
 
     @Column(nullable = false)
     private LocalDateTime fecha;
+
+    private Integer cuentaCobro;   // cuenta bancaria donde el dueño cobra (null hasta que acepta)
 }

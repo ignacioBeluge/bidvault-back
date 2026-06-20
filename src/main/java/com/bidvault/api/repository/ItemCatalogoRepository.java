@@ -11,4 +11,7 @@ public interface ItemCatalogoRepository extends JpaRepository<ItemCatalogo, Inte
 
     // Trae solo los ítems que todavía no fueron subastados.
     List<ItemCatalogo> findByCatalogoAndSubastado(Integer catalogoId, String subastado);
+
+    List<ItemCatalogo> findByProducto(Integer producto);
+
 }
