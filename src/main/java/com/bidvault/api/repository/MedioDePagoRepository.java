@@ -12,4 +12,8 @@ public interface MedioDePagoRepository extends JpaRepository<MedioDePago, Intege
     // Cuenta cuántos medios verificados tiene el cliente.
     // Si es > 0, puede pujar. Si es 0, solo puede ver la subasta.
     long countByClienteAndVerificado(Integer cliente, String verificado);
+
+    List<MedioDePago> findByClienteAndTipo(Integer cliente, String tipo);
+
+    
 }

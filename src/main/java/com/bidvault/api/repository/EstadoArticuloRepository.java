@@ -12,4 +12,6 @@ public interface EstadoArticuloRepository extends JpaRepository<EstadoArticulo, 
 
     // El estado de un producto específico
     Optional<EstadoArticulo> findByProducto(Integer producto);
+
+    boolean existsByCuentaCobro(Integer cuentaCobro);
 }

@@ -7,9 +7,6 @@ import java.time.LocalDateTime;
 @Data
 public class MultaDTO {
     private Integer id;
-    private Integer subastaId;
-    private String articulo;
-    private BigDecimal montoOfertado;
     private BigDecimal montoMulta;
     private boolean pagada;
     private LocalDateTime fechaVencimiento;

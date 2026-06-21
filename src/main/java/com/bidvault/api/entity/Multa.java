@@ -15,24 +15,21 @@ public class Multa {
     private Integer identificador;
 
     @Column(nullable = false)
-    private Integer cliente;           // FK a clientes
+    private Integer cliente;
 
     @Column(nullable = false)
-    private Integer subasta;           // FK a subastas
+    private Integer pujo;
 
-    private String articulo;           // nombre del artículo (desnormalizado para display)
-
-    @Column(nullable = false, precision = 12, scale = 2)
-    private BigDecimal montoOfertado;
-
-    @Column(nullable = false, precision = 12, scale = 2)
-    private BigDecimal montoMulta;     // 10% del montoOfertado
+    @Column(nullable = false, precision = 18, scale = 2)
+    private BigDecimal importeMulta;
 
     @Column(nullable = false, length = 2)
-    private String pagada;             // 'si' / 'no'
+    private String pagada;
 
     @Column(nullable = false)
-    private LocalDateTime fechaCreacion;
+    private LocalDateTime fechaAplicacion;
 
-    private LocalDateTime fechaVencimiento; // 72hs desde que ganó
+    private LocalDateTime fechaLimite;
+
+    private LocalDateTime fechaPago;
 }

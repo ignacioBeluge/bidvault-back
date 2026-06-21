@@ -37,4 +37,12 @@ public class MedioPagoController {
         MedioPagoDTO creado = medioPagoService.crear(usuarioId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(creado);
     }
+
+    // DELETE /usuarios/me/medios-pago/{id}
+    @DeleteMapping("/me/medios-pago/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Integer id) {
+        Integer usuarioId = SecurityUtils.getUsuarioId();
+        medioPagoService.eliminar(id, usuarioId);
+        return ResponseEntity.ok().build();
+    }
 }

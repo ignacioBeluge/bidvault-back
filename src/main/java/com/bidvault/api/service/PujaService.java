@@ -30,6 +30,7 @@ public class PujaService {
     private final ProductoRepository productoRepository;
     private final DuenioRepository duenioRepository;
     private final EstadoArticuloRepository estadoArticuloRepository;
+    private final PagoVentaRepository pagoVentaRepository;
 
     private static final int SEGUNDOS_PARA_CERRAR = 60;  // 1 minuto
     private static final List<String> CATEGORIAS_SIN_LIMITE = List.of("oro", "platino");
@@ -107,6 +108,9 @@ public class PujaService {
         if (!"si".equals(medio.getVerificado())) {
             throw new BusinessException("El medio de pago no está verificado");
         }
+
+        // 2.5 — Validar que no esté participando en otro remate activo simultáneamente
+        validarNoEstaEnOtroRemate(clienteId, itemId);
 
         // 3. Calcular y validar los límites de la puja
         //    (calcularRestricciones busca la subasta y su categoría internamente)
@@ -466,5 +470,41 @@ public class PujaService {
         notif.setParametrosNavegacion("{\"productoId\":" + producto.getIdentificador() + "}");
         notif.setFechaCreacion(LocalDateTime.now());
         notificacionRepository.save(notif);
+
+        // 9. Crear el registro de pago pendiente (72hs para pagar)
+        PagoVenta pago = new PagoVenta();
+        pago.setRegistroVenta(registro.getIdentificador());
+        pago.setCliente(compradorId);
+        pago.setMontoPujado(importePujado);
+        pago.setComision(comision);
+        pago.setEnvio(envio);
+        pago.setMontoTotal(totalAPagar);
+        pago.setEstado("PENDIENTE");
+        pago.setFechaLimite(LocalDateTime.now().plusHours(72));
+        pagoVentaRepository.save(pago);
+    }
+
+    // Verifica que el cliente no esté pujando en otro remate activo al mismo tiempo
+    private void validarNoEstaEnOtroRemate(Integer clienteId, Integer itemIdActual) {
+        // Todos los remates activos en este momento
+        List<RemateItem> rematesActivos = remateItemRepository
+                .findByEnRemateAndCerrado("si", "no");
+
+        for (RemateItem remate : rematesActivos) {
+            // Si es el mismo ítem en el que está pujando ahora, no cuenta
+            if (remate.getItem().equals(itemIdActual)) continue;
+
+            // ¿El cliente tiene alguna puja en este otro remate activo?
+            List<Pujo> pujasDelItem = pujoRepository.findByItemOrderByImporteDesc(remate.getItem());
+            for (Pujo pujo : pujasDelItem) {
+                Asistente asistente = asistenteRepository.findById(pujo.getAsistente()).orElse(null);
+                if (asistente != null && asistente.getCliente().equals(clienteId)) {
+                    // El cliente ya está participando en otro remate activo
+                    throw new BusinessException(
+                        "No podés participar en dos remates al mismo tiempo. " +
+                        "Esperá a que cierre el remate en el que ya estás pujando.");
+                }
+            }
+        }
     }
 }

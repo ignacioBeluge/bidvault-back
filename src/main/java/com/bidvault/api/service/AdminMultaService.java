@@ -26,7 +26,7 @@ public class AdminMultaService {
     private final ItemCatalogoRepository itemCatalogoRepository;
 
     @Transactional
-    public MultaAplicadaResponse aplicarMulta(Integer remateItemId) {
+        public MultaAplicadaResponse aplicarMulta(Integer remateItemId) {
 
         // 1. Obtener el remate
         RemateItem remate = remateItemRepository.findById(remateItemId)
@@ -35,12 +35,12 @@ public class AdminMultaService {
 
         // 2. Verificar que esté cerrado y tenga ganador
         if (!"si".equals(remate.getCerrado())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "El remate aún no está cerrado");
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "El remate aún no está cerrado");
         }
         if (remate.getAsistenteGanador() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Este remate no tiene ganador");
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Este remate no tiene ganador");
         }
 
         // 3. Obtener el asistente ganador → cliente
@@ -50,43 +50,37 @@ public class AdminMultaService {
 
         Integer clienteId = asistente.getCliente();
 
-        // 4. Verificar que no tenga ya una multa para este remate
-        List<Multa> multasExistentes = multaRepository.findByCliente(clienteId);
-        boolean yaMultado = multasExistentes.stream()
-                .anyMatch(m -> remate.getItem().equals(m.getSubasta()));
-        if (yaMultado) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "Ya existe una multa para este remate y cliente");
-        }
-
         // 5. Obtener la puja ganadora (la mayor del ítem)
         List<Pujo> pujos = pujoRepository.findByItemOrderByImporteDesc(remate.getItem());
         if (pujos.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "No hay pujas registradas para este ítem");
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "No hay pujas registradas para este ítem");
         }
-        BigDecimal montoOfertado = pujos.get(0).getImporte();
+        Pujo pujaGanadora = pujos.get(0);
+        BigDecimal montoOfertado = pujaGanadora.getImporte();
+
+        // 4. Verificar que no tenga ya una multa para esta puja
+        List<Multa> multasExistentes = multaRepository.findByCliente(clienteId);
+        boolean yaMultado = multasExistentes.stream()
+                .anyMatch(m -> pujaGanadora.getIdentificador().equals(m.getPujo()));
+        if (yaMultado) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "Ya existe una multa para esta puja");
+        }
 
         // 6. Calcular multa: 10% del monto ofertado
         BigDecimal montoMulta = montoOfertado
                 .multiply(BigDecimal.valueOf(0.10))
                 .setScale(2, RoundingMode.HALF_UP);
 
-        // 7. Obtener nombre del artículo para desnormalizar
-        String nombreArticulo = itemCatalogoRepository.findById(remate.getItem())
-                .map(item -> "Artículo #" + item.getProducto())
-                .orElse("Artículo desconocido");
-
-        // 8. Crear la multa
+        // 8. Crear la multa (vinculada a la puja)
         Multa multa = new Multa();
         multa.setCliente(clienteId);
-        multa.setSubasta(remate.getItem());   // usamos el itemId como referencia
-        multa.setArticulo(nombreArticulo);
-        multa.setMontoOfertado(montoOfertado);
-        multa.setMontoMulta(montoMulta);
+        multa.setPujo(pujaGanadora.getIdentificador());
+        multa.setImporteMulta(montoMulta);
         multa.setPagada("no");
-        multa.setFechaCreacion(LocalDateTime.now());
-        multa.setFechaVencimiento(LocalDateTime.now().plusHours(72));
+        multa.setFechaAplicacion(LocalDateTime.now());
+        multa.setFechaLimite(LocalDateTime.now().plusHours(72));
         multaRepository.save(multa);
 
         // 9. Bloquear al cliente
@@ -102,5 +96,5 @@ public class AdminMultaService {
                 montoMulta,
                 "Multa aplicada. Cliente bloqueado hasta regularizar el pago."
         );
-    }
+        }
 }

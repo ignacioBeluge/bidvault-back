@@ -6,8 +6,10 @@ import com.bidvault.api.entity.ChequeCertificado;
 import com.bidvault.api.entity.CuentaBancaria;
 import com.bidvault.api.entity.MedioDePago;
 import com.bidvault.api.entity.Tarjeta;
+import com.bidvault.api.exception.BusinessException;
 import com.bidvault.api.repository.ChequeCertificadoRepository;
 import com.bidvault.api.repository.CuentaBancariaRepository;
+import com.bidvault.api.repository.EstadoArticuloRepository;
 import com.bidvault.api.repository.MedioDePagoRepository;
 import com.bidvault.api.repository.TarjetaRepository;
 
@@ -27,6 +29,7 @@ public class MedioPagoService {
     private final TarjetaRepository tarjetaRepository;
     private final CuentaBancariaRepository cuentaBancariaRepository;
     private final ChequeCertificadoRepository chequeCertificadoRepository;
+    private final EstadoArticuloRepository estadoArticuloRepository;
 
 
     // Lista los medios de pago de un cliente
@@ -111,4 +114,43 @@ public class MedioPagoService {
         dto.setEsPrincipal(medio.getEsPrincipal());
         return dto;
     }
+
+    @Transactional
+    public void eliminar(Integer medioPagoId, Integer clienteId) {
+        MedioDePago medio = medioDePagoRepository.findById(medioPagoId)
+                .orElseThrow(() -> new BusinessException("Medio de pago no encontrado"));
+
+        if (!medio.getCliente().equals(clienteId)) {
+            throw new BusinessException("Este medio de pago no te pertenece");
+        }
+
+        // No se puede borrar si está declarada como cuenta de cobro de un artículo
+        if (estadoArticuloRepository.existsByCuentaCobro(medioPagoId)) {
+            throw new BusinessException(
+                "No podés eliminar esta cuenta porque está declarada como cuenta " +
+                "de cobro de un artículo. Elegí otra cuenta como cobro antes de eliminarla.");
+        }
+
+        // Borrar primero el detalle según el tipo (por la foreign key)
+        switch (medio.getTipo()) {
+            case "cuenta_bancaria" -> {
+                if (cuentaBancariaRepository.existsById(medioPagoId)) {
+                    cuentaBancariaRepository.deleteById(medioPagoId);
+                }
+            }
+            case "tarjeta" -> {
+                if (tarjetaRepository.existsById(medioPagoId)) {
+                    tarjetaRepository.deleteById(medioPagoId);
+                }
+            }
+            case "cheque_certificado" -> {
+                if (chequeCertificadoRepository.existsById(medioPagoId)) {
+                    chequeCertificadoRepository.deleteById(medioPagoId);
+                }
+            }
+        }
+
+        medioDePagoRepository.delete(medio);
+    }
+
 }
