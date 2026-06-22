@@ -1,5 +1,8 @@
 package com.bidvault.api.entity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -26,6 +29,6 @@ public class Persona {
     private String estado;       // 'activo' / 'inactivo'
 
     // varbinary(max) → byte[] en Java. @Lob para campos binarios grandes.
-    @Lob
+    @JdbcTypeCode(SqlTypes.VARBINARY)
     private byte[] foto;
 }

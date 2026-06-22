@@ -5,6 +5,9 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 @Data
 @Entity
 @Table(name = "chequesCertificados")
@@ -28,6 +31,6 @@ public class ChequeCertificado {
     @Column(nullable = false, precision = 18, scale = 2)
     private BigDecimal monto;
 
-    @Lob
-    private byte[] fotoCheque;
+    @JdbcTypeCode(SqlTypes.VARBINARY)
+    private byte[] foto;
 }

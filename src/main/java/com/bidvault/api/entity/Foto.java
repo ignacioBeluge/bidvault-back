@@ -1,5 +1,8 @@
 package com.bidvault.api.entity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -15,7 +18,7 @@ public class Foto {
     @Column(nullable = false)
     private Integer producto;   // FK a productos
 
-    @Lob
     @Column(nullable = false)
-    private byte[] foto;        // varbinary(max)
+    @JdbcTypeCode(SqlTypes.VARBINARY)
+    private byte[] foto;
 }
