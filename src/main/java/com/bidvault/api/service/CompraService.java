@@ -72,22 +72,35 @@ public class CompraService {
         PagoVenta pago = pagoVentaRepository.findById(pagoId)
                 .orElseThrow(() -> new BusinessException("Pago no encontrado"));
 
-        // Validar que el pago sea del usuario
         if (!pago.getCliente().equals(clienteId)) {
             throw new BusinessException("Este pago no te pertenece");
         }
 
-        // Validar que esté pendiente
         if (!"PENDIENTE".equals(pago.getEstado())) {
             throw new BusinessException("Este pago ya fue procesado");
         }
 
-        // Calcular la garantía disponible (suma de cheques certificados)
-        BigDecimal garantia = calcularGarantia(clienteId);
+        // ¿El usuario tiene al menos un medio de pago verificado?
+        long mediosVerificados = medioDePagoRepository
+                .countByClienteAndVerificado(clienteId, "si");
 
-        // ¿La garantía cubre el monto total?
-        if (garantia.compareTo(pago.getMontoTotal()) >= 0) {
-            // Alcanza → pago exitoso
+        // Además, si dejó cheques como garantía, validamos que cubran el total
+        BigDecimal garantia = calcularGarantia(clienteId);
+        boolean tieneCheques = garantia.compareTo(BigDecimal.ZERO) > 0;
+
+        // Puede pagar si:
+        //  - tiene algún medio verificado Y
+        //  - si usó cheques como garantía, que alcancen para el total
+        boolean puedePagar;
+        if (tieneCheques) {
+            // Si dejó cheque de garantía, las compras no pueden superar ese monto
+            puedePagar = garantia.compareTo(pago.getMontoTotal()) >= 0;
+        } else {
+            // Sin cheques: alcanza con tener un medio verificado
+            puedePagar = mediosVerificados > 0;
+        }
+
+        if (puedePagar) {
             pago.setEstado("PAGADO");
             pago.setFechaPago(LocalDateTime.now());
             pagoVentaRepository.save(pago);
@@ -95,13 +108,11 @@ public class CompraService {
             return new PagoResponse(true, false, null,
                 "Pago realizado con éxito. ¡Gracias!");
         } else {
-            // No alcanza → aplicar multa del 10% del monto pujado y bloquear
+            // No puede cubrir el pago → multa del 10% + bloqueo
             BigDecimal montoMulta = pago.getMontoPujado()
                     .multiply(new BigDecimal("0.10"))
                     .setScale(2, RoundingMode.HALF_UP);
 
-            // Buscar la puja ganadora para vincular la multa.
-            // Llegamos al producto vía el registro de venta, y de ahí al ítem y su puja.
             Integer pujoId = buscarPujoGanadora(pago.getRegistroVenta());
 
             Multa multa = new Multa();
