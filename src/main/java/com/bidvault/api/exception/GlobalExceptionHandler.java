@@ -48,14 +48,23 @@ public class GlobalExceptionHandler {
 
     // ── Cualquier otra excepción no contemplada → 500 ──
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
-        ex.printStackTrace();
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Ocurrió un error inesperado en el servidor",
-                null,
-                LocalDateTime.now()
-        );
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
+    ex.printStackTrace();
+
+    // TEMPORAL: incluir el mensaje real del error para diagnosticar
+    Map<String, String> detalles = new HashMap<>();
+    detalles.put("error", ex.getClass().getSimpleName());
+    detalles.put("causa", ex.getMessage() != null ? ex.getMessage() : "sin mensaje");
+    if (ex.getCause() != null) {
+        detalles.put("causaRaiz", ex.getCause().getMessage());
     }
+
+    ErrorResponse error = new ErrorResponse(
+            HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            "Ocurrió un error inesperado en el servidor",
+            detalles,            // ← ahora incluye el detalle real
+            LocalDateTime.now()
+    );
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+}
 }
