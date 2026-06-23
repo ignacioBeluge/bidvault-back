@@ -127,6 +127,18 @@ public class PujaService {
                 "El monto no puede superar " + limites.getPujaMaxima());
         }
 
+        //3.5 Validar que no pueda volver a pujar si soy el mayor postor
+        // Validar que no sea ya el mayor postor (no pujar contra uno mismo)
+        List<Pujo> pujasActuales = pujoRepository.findByItemOrderByImporteDesc(itemId);
+        if (!pujasActuales.isEmpty()) {
+            Pujo mayorPuja = pujasActuales.get(0);
+            Asistente mayorPostor = asistenteRepository.findById(mayorPuja.getAsistente()).orElse(null);
+            if (mayorPostor != null && mayorPostor.getCliente().equals(clienteId)) {
+                throw new BusinessException(
+                    "Ya sos el mayor postor. Esperá a que alguien te supere para volver a pujar.");
+            }
+        }
+
         // 4. Buscar (o crear) el asistente que vincula cliente con subasta
         Asistente asistente = asistenteRepository
                 .findByClienteAndSubasta(clienteId, subastaId)
