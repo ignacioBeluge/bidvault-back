@@ -375,7 +375,7 @@ public class PujaService {
                 dto.setNombreArticulo(nombreArticulo);
 
                 // ¿Ganó el remate?
-                remateItemRepository.findByItem(pujo.getItem()).ifPresent(remate -> {
+                remateItemRepository.findFirstByItemOrderByIdentificadorDesc(pujo.getItem()).ifPresent(remate -> {
                     dto.setRemateCerrado("si".equals(remate.getCerrado()));
                     dto.setGane(asistente.getIdentificador()
                             .equals(remate.getAsistenteGanador()));

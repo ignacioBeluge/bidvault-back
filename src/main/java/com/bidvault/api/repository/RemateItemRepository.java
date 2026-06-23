@@ -9,7 +9,8 @@ import java.util.List;
 public interface RemateItemRepository extends JpaRepository<RemateItem, Integer> {
 
     // El remate de un ítem específico
-    Optional<RemateItem> findByItem(Integer item);
+    Optional<RemateItem> findFirstByItemOrderByIdentificadorDesc(Integer item);
+
 
     // El ítem que está en remate activo de una subasta — lo manejamos por item
     Optional<RemateItem> findByItemAndEnRemate(Integer item, String enRemate);
