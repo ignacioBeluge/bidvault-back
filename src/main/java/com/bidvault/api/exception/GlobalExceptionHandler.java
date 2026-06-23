@@ -18,6 +18,7 @@ public class GlobalExceptionHandler {
     // ── Errores de negocio (categoría, medio de pago, monto inválido, etc.) ──
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex) {
+        ex.printStackTrace();
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 ex.getMessage(),
@@ -48,6 +49,7 @@ public class GlobalExceptionHandler {
     // ── Cualquier otra excepción no contemplada → 500 ──
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
+        ex.printStackTrace();
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "Ocurrió un error inesperado en el servidor",
