@@ -224,7 +224,7 @@ public class PujaService {
         EstadoRemateDTO dto = new EstadoRemateDTO();
 
         // 1. Buscar el remate del ítem
-        RemateItem remate = remateItemRepository.findByItem(itemId).orElse(null);
+        RemateItem remate = remateItemRepository.findFirstByItemOrderByIdentificadorDesc(itemId).orElse(null);
 
         // Si no hay remate creado, el ítem no está en remate
         if (remate == null) {
