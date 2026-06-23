@@ -32,5 +32,6 @@ public class ChequeCertificado {
     private BigDecimal monto;
 
     @JdbcTypeCode(SqlTypes.VARBINARY)
-    private byte[] foto;
+@Column(name = "fotoCheque")
+private byte[] foto;
 }
